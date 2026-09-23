@@ -1,0 +1,28 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+app/build/
+*.apk
+
+# Environment & Secrets
+.env
+.env.*
+*.env
+backend/.env
+!.env.example
+!backend/.env.example
+
+# Node.js & Backend
+node_modules/
+backend/node_modules/
+dist/
+backend/dist/
+*.log
+scratch/

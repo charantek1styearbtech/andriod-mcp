@@ -1,0 +1,42 @@
+{
+  "name": "android-mcp-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Multi-tenant, asynchronous MCP command router and WebSocket gateway for Android devices",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "test": "node --test"
+  },
+  "keywords": [
+    "mcp",
+    "android",
+    "fastify",
+    "websocket",
+    "ai-agent",
+    "multi-tenant"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "@fastify/websocket": "^10.0.1",
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "dotenv": "^16.4.7",
+    "fastify": "^4.28.1",
+    "ioredis": "^6.0.0",
+    "mongoose": "^9.10.1",
+    "uuid": "^11.1.0",
+    "ws": "^8.18.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.14",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

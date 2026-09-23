@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: android-mcp-backend
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: ALLOW_ANONYMOUS_DEV
+        value: "true"
+      - key: MCP_API_KEY
+        generateValue: true
+      - key: MCP_DEVICE_TOKEN
+        generateValue: true

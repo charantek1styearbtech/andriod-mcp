@@ -1,0 +1,66 @@
+upstream backend_cluster {
+    # Round-robin distribution across instances
+    server backend-1:3000;
+    server backend-2:3000;
+}
+
+# HTTP: Let's Encrypt ACME challenge + Auto-redirect to HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+
+    # Allow Let's Encrypt ACME HTTP-01 challenges
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Redirect all HTTP traffic to HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# HTTPS: Secure MCP Gateway & WebSocket Router
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${DOMAIN};
+
+    # SSL Certificates managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+
+    # Modern TLS configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    # Large body size for high-resolution base64 screenshots and dumps
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass http://backend_cluster;
+
+        # HTTP/1.1 and WebSocket upgrade headers
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        # Forwarded Client Headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Disable buffering for low-latency SSE (Server-Sent Events) and WebSockets
+        proxy_buffering off;
+        proxy_cache off;
+
+        # Extended timeouts for long-lived WebSocket connections (24 hours)
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+}
