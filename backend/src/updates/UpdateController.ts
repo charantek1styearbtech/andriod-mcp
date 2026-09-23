@@ -85,7 +85,7 @@ export class UpdateController {
       currentVersionCode,
       latestVersionCode: latestCode,
       latestVersionName: latestName,
-      downloadUrl: `${baseUrl}/api/update/download`,
+      downloadUrl: (meta as any)?.downloadUrl || `${baseUrl}/api/update/download`,
       apkSize: meta?.apkSize || 0,
       apkSha256: meta?.apkSha256 || '',
       changelog: meta?.changelog || 'Performance improvements and bug fixes.',

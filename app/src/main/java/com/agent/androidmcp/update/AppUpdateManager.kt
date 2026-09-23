@@ -226,10 +226,19 @@ object AppUpdateManager {
                     destinationFile.delete()
                 }
 
-                Log.i(TAG, "Downloading APK from: ${updateInfo.downloadUrl} to ${destinationFile.absolutePath}")
+                var effectiveUrl = updateInfo.downloadUrl
+                Log.i(TAG, "Downloading APK from: $effectiveUrl to ${destinationFile.absolutePath}")
 
-                val request = Request.Builder().url(updateInfo.downloadUrl).build()
-                val response = httpClient.newCall(request).execute()
+                var request = Request.Builder().url(effectiveUrl).build()
+                var response = httpClient.newCall(request).execute()
+
+                // If primary download URL fails or returns 404, fallback to GitHub Release CDN
+                if (!response.isSuccessful && !effectiveUrl.contains("github.com")) {
+                    val ghDownloadUrl = "https://github.com/charantek1styearbtech/andriod-mcp/releases/download/v${updateInfo.latestVersionName}/app-debug.apk"
+                    Log.i(TAG, "Primary download returned HTTP ${response.code}. Falling back to GitHub release: $ghDownloadUrl")
+                    request = Request.Builder().url(ghDownloadUrl).build()
+                    response = httpClient.newCall(request).execute()
+                }
 
                 if (!response.isSuccessful) {
                     _uiState.value = UpdateUiState.Error("Download failed with HTTP ${response.code}")

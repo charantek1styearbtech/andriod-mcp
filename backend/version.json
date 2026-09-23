@@ -4,6 +4,6 @@
   "changelog": "OTA Update: Added robust gateway URL resolution, fallback update check, and strict Google OAuth.",
   "apkSize": 20144796,
   "apkSha256": "b63af1865194d811ea435dd80b9d7e58f20bc8cf9cab25bc67ef4fe353c300dd",
-  "downloadUrl": "https://andriod-mcp-gateway.onrender.com/api/update/download",
+  "downloadUrl": "https://github.com/charantek1styearbtech/andriod-mcp/releases/download/v1.1.0/app-debug.apk",
   "publishedAt": "2026-09-23T10:49:50.000Z"
 }

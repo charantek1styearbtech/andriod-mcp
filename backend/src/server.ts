@@ -386,7 +386,9 @@ fastify.get('/api/update/check', async (req, reply) => {
 fastify.get('/api/update/download', async (req, reply) => {
   const filePath = updateController.getApkFilePath();
   if (!filePath) {
-    return reply.status(404).send({ error: 'No APK release published yet' });
+    const meta = updateController.getLatestMetadata();
+    const fallbackUrl = (meta as any)?.downloadUrl || `https://github.com/charantek1styearbtech/andriod-mcp/releases/download/v${meta?.versionName || '1.1.0'}/app-debug.apk`;
+    return reply.redirect(fallbackUrl);
   }
 
   const meta = updateController.getLatestMetadata();
