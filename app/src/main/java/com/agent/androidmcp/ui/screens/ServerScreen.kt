@@ -682,7 +682,7 @@ fun ServerScreen(
                     when (val state = updateUiState) {
                         is com.agent.androidmcp.update.UpdateUiState.Idle -> {
                             Button(
-                                onClick = { com.agent.androidmcp.update.AppUpdateManager.checkForUpdate(context) },
+                                onClick = { com.agent.androidmcp.update.AppUpdateManager.checkForUpdate(context, effectiveGatewayUrl) },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(42.dp),
@@ -763,7 +763,7 @@ fun ServerScreen(
                                 }
 
                                 OutlinedButton(
-                                    onClick = { com.agent.androidmcp.update.AppUpdateManager.checkForUpdate(context) },
+                                    onClick = { com.agent.androidmcp.update.AppUpdateManager.checkForUpdate(context, effectiveGatewayUrl) },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(38.dp),
@@ -936,7 +936,7 @@ fun ServerScreen(
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 OutlinedButton(
-                                    onClick = { com.agent.androidmcp.update.AppUpdateManager.checkForUpdate(context) },
+                                    onClick = { com.agent.androidmcp.update.AppUpdateManager.checkForUpdate(context, effectiveGatewayUrl) },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(36.dp),

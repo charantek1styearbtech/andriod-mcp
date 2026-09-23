@@ -77,7 +77,7 @@ object AppUpdateManager {
         }
     }
 
-    fun checkForUpdate(context: Context, silent: Boolean = false) {
+    fun checkForUpdate(context: Context, baseUrl: String? = null, silent: Boolean = false) {
         if (_uiState.value is UpdateUiState.Downloading) return
 
         _uiState.value = UpdateUiState.Checking
@@ -85,7 +85,22 @@ object AppUpdateManager {
         scope.launch {
             try {
                 val currentCode = getCurrentVersionCode(context)
-                val url = "$DEFAULT_CHECK_URL?currentVersionCode=$currentCode"
+                val checkBase = if (!baseUrl.isNullOrBlank()) {
+                    val trimmed = baseUrl.trim().trimEnd('/')
+                    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+                        trimmed
+                    } else if (trimmed.startsWith("ws://")) {
+                        "http://" + trimmed.removePrefix("ws://")
+                    } else if (trimmed.startsWith("wss://")) {
+                        "https://" + trimmed.removePrefix("wss://")
+                    } else {
+                        "https://$trimmed"
+                    }
+                } else {
+                    DEFAULT_CHECK_URL.substringBefore("/api/update/check")
+                }
+
+                val url = "$checkBase/api/update/check?currentVersionCode=$currentCode"
 
                 val request = Request.Builder().url(url).build()
                 val response = httpClient.newCall(request).execute()
@@ -102,7 +117,10 @@ object AppUpdateManager {
                 val updateAvailable = json.optBoolean("updateAvailable", false)
                 val latestCode = json.optInt("latestVersionCode", currentCode)
                 val latestName = json.optString("latestVersionName", "1.0.0")
-                val downloadUrl = json.optString("downloadUrl", "")
+                var downloadUrl = json.optString("downloadUrl", "")
+                if (downloadUrl.startsWith("/")) {
+                    downloadUrl = "$checkBase$downloadUrl"
+                }
                 val apkSize = json.optLong("apkSize", 0L)
                 val changelog = json.optString("changelog", "Bug fixes and performance improvements.")
                 val publishedAt = json.optString("publishedAt", "")
