@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "android": {
+      "command": "node",
+      "args": [
+        "c:/Users/chara/Desktop/Andriod MCP/backend/bin/mcp-stdio.js"
+      ],
+      "env": {
+        "GATEWAY_URL": "https://andriod-mcp-gateway.onrender.com/mcp",
+        "USER_EMAIL": "reddypavitra687@gmail.com",
+        "MCP_API_KEY": "mcp-user-secret-key-101"
+      }
+    }
+  }
+}
