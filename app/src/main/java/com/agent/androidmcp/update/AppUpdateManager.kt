@@ -50,9 +50,32 @@ object AppUpdateManager {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
         .build()
+
+    /**
+     * Extracts the HTTP/HTTPS origin (scheme + host + port) from any given URL or WebSocket URL.
+     * E.g.: "wss://andriod-mcp-gateway.onrender.com/device/ws" -> "https://andriod-mcp-gateway.onrender.com"
+     *       "ws://192.168.1.6:8080/device/ws" -> "http://192.168.1.6:8080"
+     */
+    fun resolveHttpBaseUrl(rawUrl: String?): String {
+        if (rawUrl.isNullOrBlank()) {
+            return "https://andriod-mcp-gateway.onrender.com"
+        }
+        val clean = rawUrl.trim()
+        val isSecure = clean.startsWith("wss://", ignoreCase = true) || clean.startsWith("https://", ignoreCase = true)
+        val scheme = if (isSecure) "https" else "http"
+        val withoutScheme = clean.replaceFirst(Regex("^(wss?|https?)://", RegexOption.IGNORE_CASE), "")
+        val hostAndPort = withoutScheme.substringBefore('/')
+        return if (hostAndPort.isNotBlank()) {
+            "$scheme://$hostAndPort"
+        } else {
+            "https://andriod-mcp-gateway.onrender.com"
+        }
+    }
 
     fun getCurrentVersionCode(context: Context): Int {
         return try {
@@ -85,41 +108,71 @@ object AppUpdateManager {
         scope.launch {
             try {
                 val currentCode = getCurrentVersionCode(context)
-                val checkBase = if (!baseUrl.isNullOrBlank()) {
-                    val trimmed = baseUrl.trim().trimEnd('/')
-                    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-                        trimmed
-                    } else if (trimmed.startsWith("ws://")) {
-                        "http://" + trimmed.removePrefix("ws://")
-                    } else if (trimmed.startsWith("wss://")) {
-                        "https://" + trimmed.removePrefix("wss://")
+                val checkBase = resolveHttpBaseUrl(baseUrl)
+                val primaryUrl = "$checkBase/api/update/check?currentVersionCode=$currentCode"
+                Log.i(TAG, "Checking for updates at primary URL: $primaryUrl")
+
+                var responseString: String? = null
+                var effectiveOrigin = checkBase
+
+                // 1. Try primary gateway endpoint
+                try {
+                    val request = Request.Builder().url(primaryUrl).build()
+                    val response = httpClient.newCall(request).execute()
+                    if (response.isSuccessful) {
+                        responseString = response.body?.string().orEmpty()
                     } else {
-                        "https://$trimmed"
+                        Log.w(TAG, "Primary update server returned HTTP ${response.code} ($primaryUrl)")
                     }
-                } else {
-                    DEFAULT_CHECK_URL.substringBefore("/api/update/check")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Primary update server connection failed ($primaryUrl): ${e.message}")
                 }
 
-                val url = "$checkBase/api/update/check?currentVersionCode=$currentCode"
+                // 2. If primary failed (e.g. Render 404/asleep), try GitHub Raw release metadata as fallback
+                if (responseString.isNullOrBlank()) {
+                    val githubFallbackUrl = "https://raw.githubusercontent.com/charantek1styearbtech/andriod-mcp/main/version.json"
+                    Log.i(TAG, "Attempting GitHub fallback update check: $githubFallbackUrl")
+                    try {
+                        val ghReq = Request.Builder().url(githubFallbackUrl).build()
+                        val ghResp = httpClient.newCall(ghReq).execute()
+                        if (ghResp.isSuccessful) {
+                            val ghBody = ghResp.body?.string().orEmpty()
+                            val ghJson = JSONObject(ghBody)
+                            val latestCode = ghJson.optInt("versionCode", currentCode)
+                            val isUpdateAvailable = latestCode > currentCode
+                            
+                            // Synthesize standard checkUpdate response
+                            val synthesized = JSONObject().apply {
+                                put("updateAvailable", isUpdateAvailable)
+                                put("latestVersionCode", latestCode)
+                                put("latestVersionName", ghJson.optString("versionName", "1.1.0"))
+                                put("downloadUrl", ghJson.optString("downloadUrl", "$checkBase/api/update/download"))
+                                put("apkSize", ghJson.optLong("apkSize", 0L))
+                                put("changelog", ghJson.optString("changelog", "Bug fixes and performance improvements."))
+                                put("publishedAt", ghJson.optString("publishedAt", ""))
+                            }
+                            responseString = synthesized.toString()
+                            effectiveOrigin = checkBase
+                            Log.i(TAG, "Successfully retrieved update info from GitHub fallback!")
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "GitHub fallback check failed: ${e.message}")
+                    }
+                }
 
-                val request = Request.Builder().url(url).build()
-                val response = httpClient.newCall(request).execute()
-
-                if (!response.isSuccessful) {
-                    val msg = "Server error ${response.code}"
+                if (responseString.isNullOrBlank()) {
+                    val msg = "Could not connect to update server ($checkBase). Check network or server status."
                     if (!silent) _uiState.value = UpdateUiState.Error(msg)
                     return@launch
                 }
 
-                val bodyStr = response.body?.string().orEmpty()
-                val json = JSONObject(bodyStr)
-
+                val json = JSONObject(responseString)
                 val updateAvailable = json.optBoolean("updateAvailable", false)
                 val latestCode = json.optInt("latestVersionCode", currentCode)
                 val latestName = json.optString("latestVersionName", "1.0.0")
                 var downloadUrl = json.optString("downloadUrl", "")
                 if (downloadUrl.startsWith("/")) {
-                    downloadUrl = "$checkBase$downloadUrl"
+                    downloadUrl = "$effectiveOrigin$downloadUrl"
                 }
                 val apkSize = json.optLong("apkSize", 0L)
                 val changelog = json.optString("changelog", "Bug fixes and performance improvements.")

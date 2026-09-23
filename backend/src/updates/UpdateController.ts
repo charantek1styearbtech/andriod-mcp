@@ -40,6 +40,18 @@ export class UpdateController {
       } catch (err) {
         console.warn(`[UpdateController] Failed to parse version.json:`, err);
       }
+    } else {
+      // Fallback to committed version.json if running in fresh container (e.g. Render)
+      const fallbackPath = path.resolve(__dirname, '../../version.json');
+      if (fs.existsSync(fallbackPath)) {
+        try {
+          const raw = fs.readFileSync(fallbackPath, 'utf-8');
+          this.currentMetadata = JSON.parse(raw);
+          console.log(`[UpdateController] Loaded fallback release v${this.currentMetadata?.versionName} (Build ${this.currentMetadata?.versionCode})`);
+        } catch (err) {
+          console.warn(`[UpdateController] Failed to parse fallback version.json:`, err);
+        }
+      }
     }
   }
 
