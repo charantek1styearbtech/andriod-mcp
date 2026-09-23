@@ -117,7 +117,7 @@ fun ChatScreen(
         mutableStateListOf(
             ChatMessage(
                 sender = MessageSender.AGENT,
-                text = "Hi! I am your Autonomous Android AI Agent.\nEquipped with ReAct Reasoning Loop (Milestone 5 & 6)."
+                text = "Hi! I am your Autonomous Android AI Agent.\nEquipped with ReAct Reasoning Loop."
             ),
             ChatMessage(
                 sender = MessageSender.SYSTEM,
