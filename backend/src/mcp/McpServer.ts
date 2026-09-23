@@ -484,23 +484,27 @@ export class McpServer {
       const email = (args.email as string)?.toLowerCase().trim();
       const apiKey = args.api_key as string | undefined;
 
-      if (!email && !apiKey) {
-        const publicUrl = process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`;
-        const loginUrl = `${publicUrl}/auth/google/login?sessionId=${encodeURIComponent(sessionId)}`;
+      // If no valid developer API key is provided, require Google OAuth browser authentication
+      if (!apiKey) {
+        const publicUrl = process.env.PUBLIC_URL || `https://andriod-mcp-gateway.onrender.com`;
+        const emailParam = email ? `&email=${encodeURIComponent(email)}` : '';
+        const loginUrl = `${publicUrl}/auth/google/login?sessionId=${encodeURIComponent(sessionId)}${emailParam}`;
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify(
                 {
-                  actionRequired: 'BROWSER_LOGIN',
-                  message: 'Please complete Google authentication in your browser to link your Android devices.',
+                  actionRequired: 'GOOGLE_OAUTH_REQUIRED',
+                  status: 'AWAITING_BROWSER_LOGIN',
+                  message:
+                    'Strict Google OAuth verification is required. Mentioning an email address alone is not sufficient to access Android devices. Please complete Google Sign-In in your browser.',
                   loginUrl,
-                  markdownLink: `[Click here to Log In with Google](${loginUrl})`,
+                  markdownLink: `[Click here to Sign In with Google](${loginUrl})`,
                   instructions: [
-                    `1. Click or open this Google Login link in your browser: ${loginUrl}`,
+                    `1. Open this link in your browser: ${loginUrl}`,
                     '2. Sign in with the Google account linked to your Android phone.',
-                    '3. Once authenticated in your browser, return here. Your session will be automatically authenticated with your devices.',
+                    '3. Once verified, return here. Your session will be securely linked to your Android devices.',
                   ],
                 },
                 null,
@@ -511,16 +515,12 @@ export class McpServer {
         };
       }
 
-      let user = apiKey ? authManager.authenticateUser(apiKey) : null;
-      if (!user && email) {
-        user = authManager.getOrCreateUserForEmail(email);
-      }
-
+      const user = authManager.authenticateUser(apiKey);
       if (!user) {
-        throw new Error('Authentication failed: Invalid credentials.');
+        throw new Error('Authentication failed: Invalid API key.');
       }
 
-      sessionManager.setAuthenticatedUser(sessionId, user.userId, email || user.email);
+      sessionManager.setAuthenticatedUser(sessionId, user.userId, email || user.email, true);
 
       // Auto-select primary device if available
       const devices = email
@@ -539,7 +539,7 @@ export class McpServer {
             text: JSON.stringify(
               {
                 success: true,
-                message: `Session authenticated for ${email || user.userId}.${selectedMsg}`,
+                message: `Session authenticated with API key for ${email || user.userId}.${selectedMsg}`,
                 userId: user.userId,
                 email: email || user.email,
                 availableDevicesCount: devices.length,
@@ -551,6 +551,43 @@ export class McpServer {
           },
         ],
       };
+    }
+
+    // ----------------------------------------------------
+    // Strict OAuth Check for all subsequent device tools
+    // ----------------------------------------------------
+    const verifiedEmail = await sessionManager.getVerifiedEmailAsync(sessionId);
+    const isVerified = !!verifiedEmail || session.isOAuthVerified;
+
+    if (!isVerified) {
+      const publicUrl = process.env.PUBLIC_URL || `https://andriod-mcp-gateway.onrender.com`;
+      const requestedEmail = (currentEmail || (args.email as string)) as string | undefined;
+      const emailQuery = requestedEmail ? `&email=${encodeURIComponent(requestedEmail)}` : '';
+      const loginUrl = `${publicUrl}/auth/google/login?sessionId=${encodeURIComponent(sessionId)}${emailQuery}`;
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                error: 'GOOGLE_OAUTH_REQUIRED',
+                message:
+                  'Access denied: Android device commands require Google OAuth authentication. Mentioning an email address alone is not sufficient. Please complete authentication in your browser first.',
+                loginUrl,
+                markdownLink: `[Click here to Authenticate via Google OAuth](${loginUrl})`,
+                nextStep: `Open ${loginUrl} in your browser to sign in with Google, then retry your request.`,
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
+    }
+
+    if (verifiedEmail) {
+      currentEmail = verifiedEmail;
     }
 
     // ----------------------------------------------------

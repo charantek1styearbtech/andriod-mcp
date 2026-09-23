@@ -1,6 +1,8 @@
+import fs from 'fs';
 import Fastify from 'fastify';
 import fastifyCors from '@fastify/cors';
 import fastifyWebsocket from '@fastify/websocket';
+import fastifyMultipart from '@fastify/multipart';
 import type { WebSocket } from 'ws';
 import dotenv from 'dotenv';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
@@ -12,6 +14,7 @@ import { sessionManager } from './mcp/SessionManager.js';
 import { redisClusterManager } from './db/redis.js';
 import { mongoDatabase } from './db/mongo.js';
 import { DeviceIncomingMessage } from './types/protocol.js';
+import { updateController } from './updates/UpdateController.js';
 
 dotenv.config();
 
@@ -40,6 +43,12 @@ await fastify.register(fastifyCors, {
 await fastify.register(fastifyWebsocket, {
   options: {
     maxPayload: 10 * 1024 * 1024, // 10MB payload limit (for high-res base64 screenshots)
+  },
+});
+
+await fastify.register(fastifyMultipart, {
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB max APK size
   },
 });
 
@@ -177,9 +186,9 @@ fastify.get('/auth/google/callback', async (req, reply) => {
     `);
   }
 
-  // Link user and session across cluster
+  // Link user and session across cluster with strict OAuth verification
   const user = authManager.getOrCreateUserForEmail(email);
-  sessionManager.setAuthenticatedUser(sessionId, user.userId, email);
+  await sessionManager.setVerifiedSessionAsync(sessionId, email);
 
   // Auto-select primary device if available
   const devices = await deviceRegistry.getDevicesForEmailAsync(email);
@@ -294,7 +303,8 @@ fastify.get('/sse', async (req, reply) => {
     apiKey = apiKeyParam.trim();
   }
 
-  let user = authManager.authenticateUser(apiKey);
+  const isApiKeyAuthenticated = !!authManager.authenticateUser(apiKey);
+  let user = isApiKeyAuthenticated ? authManager.authenticateUser(apiKey) : null;
   if (!user && emailHeader) {
     user = authManager.getOrCreateUserForEmail(emailHeader);
   }
@@ -312,7 +322,9 @@ fastify.get('/sse', async (req, reply) => {
   sseTransports.set(sessionId, transport);
 
   const effectiveEmail = emailHeader || user.email;
-  sessionManager.getOrCreateSession(sessionId, user.userId, effectiveEmail);
+  // Security: Only mark session as verified if valid developer API key is provided.
+  // Passing email alone creates an unverified guest session that must complete Google OAuth.
+  sessionManager.getOrCreateSession(sessionId, user.userId, effectiveEmail, isApiKeyAuthenticated);
 
   transport.onclose = () => {
     sseTransports.delete(sessionId);
@@ -350,6 +362,109 @@ fastify.post('/messages', async (req, reply) => {
   }
 
   await transport.handlePostMessage(req.raw, reply.raw, req.body);
+});
+
+// ============================================================================
+// Auto-Update Endpoints (Developer & User Ends)
+// ============================================================================
+
+// 1. Developer Web Portal for Uploading & Managing Releases
+fastify.get('/developer/update', async (req, reply) => {
+  const publicUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.hostname}`;
+  reply.type('text/html').send(updateController.renderDeveloperPortal(publicUrl));
+});
+
+// 2. Client Update Checker (Used by Android app)
+fastify.get('/api/update/check', async (req, reply) => {
+  const query = req.query as { currentVersionCode?: string };
+  const currentCode = parseInt(query.currentVersionCode || '0', 10);
+  const publicUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.hostname}`;
+  return reply.send(updateController.checkUpdate(currentCode, publicUrl));
+});
+
+// 3. Binary APK Download Stream (Used by in-app auto-updater)
+fastify.get('/api/update/download', async (req, reply) => {
+  const filePath = updateController.getApkFilePath();
+  if (!filePath) {
+    return reply.status(404).send({ error: 'No APK release published yet' });
+  }
+
+  const meta = updateController.getLatestMetadata();
+  const filename = meta ? `android-agent-v${meta.versionName}.apk` : 'android-agent.apk';
+  const stat = fs.statSync(filePath);
+
+  reply.header('Content-Type', 'application/vnd.android.package-archive');
+  reply.header('Content-Disposition', `attachment; filename="${filename}"`);
+  reply.header('Content-Length', stat.size);
+
+  const stream = fs.createReadStream(filePath);
+  return reply.send(stream);
+});
+
+// 4. Developer Publishing Endpoint (CLI & Web Form)
+fastify.post('/api/update/publish', async (req, reply) => {
+  const isMultipart = req.isMultipart();
+  let apkBuffer: Buffer | null = null;
+  let versionCode = 1;
+  let versionName = '1.0.0';
+  let changelog = '';
+  let apiKey = (req.headers['x-api-key'] as string) || '';
+
+  const authHeader = (req.headers['authorization'] as string) || '';
+  if (authHeader.startsWith('Bearer ')) {
+    apiKey = authHeader.substring(7).trim();
+  }
+
+  if (isMultipart) {
+    const parts = req.parts();
+    for await (const part of parts) {
+      if (part.type === 'file' && (part.fieldname === 'apk' || part.fieldname === 'file')) {
+        apkBuffer = await part.toBuffer();
+      } else if (part.type === 'field') {
+        if (part.fieldname === 'versionCode') versionCode = parseInt(part.value as string, 10);
+        if (part.fieldname === 'versionName') versionName = (part.value as string).trim();
+        if (part.fieldname === 'changelog') changelog = (part.value as string).trim();
+        if (part.fieldname === 'apiKey') apiKey = (part.value as string).trim();
+      }
+    }
+  } else {
+    const body = req.body as any;
+    if (body?.apkBase64) {
+      apkBuffer = Buffer.from(body.apkBase64, 'base64');
+      versionCode = parseInt(body.versionCode || '1', 10);
+      versionName = body.versionName || '1.0.0';
+      changelog = body.changelog || '';
+      if (body.apiKey) apiKey = body.apiKey;
+    }
+  }
+
+  // Developer security validation
+  const defaultApiKey = process.env.MCP_API_KEY || 'mcp-user-secret-key-101';
+  if (apiKey !== defaultApiKey) {
+    return reply.status(401).send({ error: 'Unauthorized: Invalid developer API key' });
+  }
+
+  if (!apkBuffer || apkBuffer.length === 0) {
+    return reply.status(400).send({ error: 'No APK binary payload provided' });
+  }
+
+  const metadata = await updateController.publishUpdate(
+    apkBuffer,
+    versionCode,
+    versionName,
+    changelog
+  );
+
+  // If submitted from browser form, redirect back to developer dashboard
+  if (req.headers['accept']?.includes('text/html')) {
+    return reply.redirect('/developer/update');
+  }
+
+  return reply.send({
+    success: true,
+    message: `Release v${versionName} (Build ${versionCode}) published successfully.`,
+    metadata,
+  });
 });
 
 // Direct HTTPS Forwarding API: Forward instructions to Android device via Gmail or Device ID

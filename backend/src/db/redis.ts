@@ -246,6 +246,26 @@ export class RedisClusterManager {
     }
   }
 
+  public async setVerifiedSession(sessionId: string, email: string): Promise<void> {
+    if (!this.isAvailable()) return;
+
+    try {
+      await this.client!.set(`session:${sessionId}:verifiedEmail`, email.toLowerCase().trim(), 'EX', 86400);
+    } catch (err) {
+      console.warn('[Redis] Error setting verified session:', (err as Error).message);
+    }
+  }
+
+  public async getVerifiedSession(sessionId: string): Promise<string | null> {
+    if (!this.isAvailable()) return null;
+
+    try {
+      return await this.client!.get(`session:${sessionId}:verifiedEmail`);
+    } catch {
+      return null;
+    }
+  }
+
   // ----------------------------------------------------
   // Pub/Sub: Cross-Instance Command Dispatch & Result Return
   // ----------------------------------------------------

@@ -9,10 +9,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -612,6 +616,341 @@ fun ServerScreen(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ==========================================
+            // In-App Auto Update & Version Information Card
+            // ==========================================
+            val updateUiState by com.agent.androidmcp.update.AppUpdateManager.uiState.collectAsState()
+            val currentVersionName = remember { com.agent.androidmcp.update.AppUpdateManager.getCurrentVersionName(context) }
+            val currentVersionCode = remember { com.agent.androidmcp.update.AppUpdateManager.getCurrentVersionCode(context) }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                border = BorderStroke(1.dp, BorderSubtle),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.SystemUpdate,
+                                contentDescription = null,
+                                tint = AccentTeal,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "App Updates & Version",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+
+                        // Version badge
+                        Surface(
+                            color = AccentTeal.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "v$currentVersionName ($currentVersionCode)",
+                                color = AccentTeal,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Check and automatically install over-the-air APK updates directly from the gateway.",
+                        fontSize = 12.sp,
+                        color = TextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Dynamic State Rendering
+                    when (val state = updateUiState) {
+                        is com.agent.androidmcp.update.UpdateUiState.Idle -> {
+                            Button(
+                                onClick = { com.agent.androidmcp.update.AppUpdateManager.checkForUpdate(context) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(42.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentTeal),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Check for Updates",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+
+                        is com.agent.androidmcp.update.UpdateUiState.Checking -> {
+                            Surface(
+                                color = Color.Black.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(42.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        color = AccentTeal,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = "Checking for new version...",
+                                        fontSize = 13.sp,
+                                        color = TextSecondary
+                                    )
+                                }
+                            }
+                        }
+
+                        is com.agent.androidmcp.update.UpdateUiState.UpToDate -> {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Surface(
+                                    color = SuccessGreen.copy(alpha = 0.12f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = SuccessGreen,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "App is up to date (${state.currentVersion})",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = SuccessGreen
+                                        )
+                                    }
+                                }
+
+                                OutlinedButton(
+                                    onClick = { com.agent.androidmcp.update.AppUpdateManager.checkForUpdate(context) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(38.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, BorderSubtle)
+                                ) {
+                                    Text("Check Again", fontSize = 12.sp, color = TextPrimary)
+                                }
+                            }
+                        }
+
+                        is com.agent.androidmcp.update.UpdateUiState.Available -> {
+                            val info = state.info
+                            val mbSize = if (info.apkSize > 0) String.format("%.1f MB", info.apkSize / (1024f * 1024f)) else "APK"
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(AccentTeal.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                                    .padding(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "New Update: v${info.latestVersionName}",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = AccentTeal
+                                    )
+                                    Text(
+                                        text = mbSize,
+                                        fontSize = 11.sp,
+                                        color = TextSecondary
+                                    )
+                                }
+
+                                if (info.changelog.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = info.changelog,
+                                        fontSize = 12.sp,
+                                        color = TextPrimary
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Button(
+                                    onClick = { com.agent.androidmcp.update.AppUpdateManager.startDownload(context, info) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(40.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = AccentTeal),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudDownload,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Download & Install Update", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+                        }
+
+                        is com.agent.androidmcp.update.UpdateUiState.Downloading -> {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                                    .padding(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Downloading Update...",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = TextPrimary
+                                    )
+                                    Text(
+                                        text = "${state.progressPercent}%",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = AccentTeal
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                LinearProgressIndicator(
+                                    progress = { state.progressPercent / 100f },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp),
+                                    color = AccentTeal,
+                                    trackColor = BorderSubtle
+                                )
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                val downloadedMb = String.format("%.1f", state.downloadedBytes / (1024f * 1024f))
+                                val totalMb = String.format("%.1f MB", state.totalBytes / (1024f * 1024f))
+                                Text(
+                                    text = "$downloadedMb MB / $totalMb",
+                                    fontSize = 11.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+
+                        is com.agent.androidmcp.update.UpdateUiState.ReadyToInstall -> {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(SuccessGreen.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = "Update downloaded successfully!",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SuccessGreen
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Tap below if the package installer prompt did not appear automatically.",
+                                    fontSize = 11.sp,
+                                    color = TextSecondary
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = { com.agent.androidmcp.update.AppUpdateManager.installApk(context, state.apkFile) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(38.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Open Installer", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+                        }
+
+                        is com.agent.androidmcp.update.UpdateUiState.Error -> {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(ErrorRed.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = "Update Check Failed",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ErrorRed
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = state.message,
+                                    fontSize = 11.sp,
+                                    color = TextSecondary
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedButton(
+                                    onClick = { com.agent.androidmcp.update.AppUpdateManager.checkForUpdate(context) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(36.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, BorderSubtle)
+                                ) {
+                                    Text("Retry Check", fontSize = 12.sp, color = TextPrimary)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
