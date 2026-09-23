@@ -25,8 +25,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.agent.androidmcp.server.AndroidServer
-import com.agent.androidmcp.server.ServerState
 import com.agent.androidmcp.ui.components.ServiceStatusBanner
 import com.agent.androidmcp.ui.theme.*
 
@@ -37,32 +35,7 @@ fun ServerScreen(
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
-    val serverStatus by ServerState.status.collectAsState()
     val scrollState = rememberScrollState()
-
-    var portInput by remember { mutableStateOf("8080") }
-
-    val claudeConfigJson = remember(serverStatus.ipAddress, serverStatus.port) {
-        """
-{
-  "mcpServers": {
-    "android": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote-client",
-        "--url",
-        "http://${serverStatus.ipAddress}:${serverStatus.port}/mcp"
-      ]
-    }
-  }
-}
-""".trimIndent()
-    }
-
-    val adbCommand = remember(serverStatus.port) {
-        "adb forward tcp:${serverStatus.port} tcp:${serverStatus.port}"
-    }
 
     Column(
         modifier = modifier
@@ -73,157 +46,6 @@ fun ServerScreen(
         ServiceStatusBanner(isConnected = isConnected)
 
         Column(modifier = Modifier.padding(16.dp)) {
-            // Header card with Start/Stop
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
-                border = BorderStroke(1.dp, BorderSubtle),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                            Text(
-                                text = "Embedded Server & MCP",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (serverStatus.isRunning) "Running on http://${serverStatus.ipAddress}:${serverStatus.port}" else "Server Stopped",
-                                fontSize = 12.sp,
-                                color = if (serverStatus.isRunning) SuccessGreen else TextSecondary
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                val server = AndroidServer.getInstance(context, portInput.toIntOrNull() ?: 8080)
-                                if (serverStatus.isRunning) {
-                                    server.stop()
-                                    Toast.makeText(context, "Server stopped", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    server.start()
-                                    Toast.makeText(context, "Server started on port ${serverStatus.port}", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (serverStatus.isRunning) ErrorRed else AccentTeal
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (serverStatus.isRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(if (serverStatus.isRunning) "Stop" else "Start", maxLines = 1)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-                    HorizontalDivider(color = SurfaceLight)
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text("Active WS Clients", fontSize = 11.sp, color = TextSecondary)
-                            Text("${serverStatus.activeConnections}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                        }
-                        Column {
-                            Text("Total Requests", fontSize = 11.sp, color = TextSecondary)
-                            Text("${serverStatus.totalRequests}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = AccentTeal)
-                        }
-                        Column {
-                            Text("Port", fontSize = 11.sp, color = TextSecondary)
-                            Text("${serverStatus.port}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Status: ${serverStatus.lastLog}",
-                        fontSize = 11.sp,
-                        color = TextSecondary,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // MCP Protocol Info Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
-                border = BorderStroke(1.dp, BorderSubtle),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Model Context Protocol (MCP)",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Endpoint: http://${serverStatus.ipAddress}:${serverStatus.port}/mcp\nExposes tools: android_get_screen, android_take_screenshot, android_execute_action, android_run_goal.",
-                        fontSize = 12.sp,
-                        color = TextSecondary
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Claude Desktop Config",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AccentTeal
-                        )
-                        IconButton(
-                            onClick = {
-                                clipboardManager.setText(AnnotatedString(claudeConfigJson))
-                                Toast.makeText(context, "Copied Claude Desktop Config", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(16.dp), tint = TextSecondary)
-                        }
-                    }
-
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.4f),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = claudeConfigJson,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = TextPrimary,
-                            modifier = Modifier.padding(10.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
             // Remote Fleet Gateway Card
             val gatewayStatus by com.agent.androidmcp.server.remote.RemoteGatewayState.status.collectAsState()
             var gatewayUrlInput by remember { mutableStateOf(gatewayStatus.serverUrl) }
@@ -680,6 +502,113 @@ fun ServerScreen(
                             Text("Actions Run", fontSize = 11.sp, color = TextSecondary)
                             Text("${gatewayStatus.actionsExecuted}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentTeal)
                         }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // AI Client Quick Setup Card
+            val emailForConfig = googleAccount.email ?: "your-gmail@gmail.com"
+            val claudeCodeCmd = "claude mcp add android -- https://andriod-mcp-gateway.onrender.com/sse?email=$emailForConfig"
+            val cursorSseUrl = "https://andriod-mcp-gateway.onrender.com/sse?email=$emailForConfig"
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                border = BorderStroke(1.dp, BorderSubtle),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Connect AI Clients",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Use this endpoint in Claude Code or Cursor to control your phone via Google Account.",
+                        fontSize = 12.sp,
+                        color = TextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Claude Code setup
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Claude Code Command",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AccentTeal
+                        )
+                        IconButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(claudeCodeCmd))
+                                Toast.makeText(context, "Copied Claude Code command", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(15.dp), tint = TextSecondary)
+                        }
+                    }
+
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = claudeCodeCmd,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = TextPrimary,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Cursor SSE URL setup
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Cursor SSE Gateway URL",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AccentTeal
+                        )
+                        IconButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(cursorSseUrl))
+                                Toast.makeText(context, "Copied Cursor SSE URL", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(15.dp), tint = TextSecondary)
+                        }
+                    }
+
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = cursorSseUrl,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = TextPrimary,
+                            modifier = Modifier.padding(10.dp)
+                        )
                     }
                 }
             }

@@ -38,9 +38,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Automatically start embedded server for MCP & REST access
-        com.agent.androidmcp.server.AndroidServer.getInstance(this, 8080).start()
-
         // Initialize Remote Gateway Config from preferences
         val gatewayConfig = com.agent.androidmcp.server.remote.RemoteGatewayConfigRepository.loadConfig(this)
         com.agent.androidmcp.server.remote.RemoteGatewayState.updateConfig(
@@ -235,7 +232,7 @@ fun MainAppScaffold() {
                             modifier = Modifier.size(20.dp)
                         )
                     },
-                    label = { Text("Server & MCP", fontSize = 11.sp, fontWeight = if (selectedTabIndex == 2) FontWeight.SemiBold else FontWeight.Normal) },
+                    label = { Text("Cloud Gateway", fontSize = 11.sp, fontWeight = if (selectedTabIndex == 2) FontWeight.SemiBold else FontWeight.Normal) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = AccentTeal,
                         indicatorColor = AccentTeal.copy(alpha = 0.15f),
