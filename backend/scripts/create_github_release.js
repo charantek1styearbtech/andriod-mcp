@@ -43,10 +43,10 @@ async function main() {
     uploadUrl = existing.upload_url;
     console.log(`[GitHub Release] Release ${TAG} already exists (id: ${releaseId}). Checking assets...`);
 
-    // Check if asset app-debug.apk already exists and delete it to re-upload
+    // Check if assets already exist and delete them to re-upload
     for (const asset of existing.assets || []) {
-      if (asset.name === 'app-debug.apk') {
-        console.log(`[GitHub Release] Deleting old asset ${asset.id}...`);
+      if (asset.name === 'app-debug.apk' || asset.name === 'andriod-agent.apk') {
+        console.log(`[GitHub Release] Deleting old asset ${asset.name} (${asset.id})...`);
         await fetch(`https://api.github.com/repos/${REPO}/releases/assets/${asset.id}`, {
           method: 'DELETE',
           headers: {
@@ -88,31 +88,39 @@ async function main() {
     console.log(`[GitHub Release] Created release ${TAG} (id: ${releaseId})`);
   }
 
-  // 3. Upload APK binary asset
-  const targetUploadUrl = uploadUrl.replace(/\{.*?\}$/, '') + '?name=app-debug.apk';
-  console.log(`[GitHub Release] Uploading asset to: ${targetUploadUrl}`);
+  // 3. Upload APK binary assets (both andriod-agent.apk and app-debug.apk)
+  const apkFilesToUpload = [
+    { name: 'andriod-agent.apk', path: path.resolve(__dirname, '../../app/build/outputs/apk/debug/andriod-agent.apk') },
+    { name: 'app-debug.apk', path: path.resolve(__dirname, '../../app/build/outputs/apk/debug/app-debug.apk') }
+  ];
 
-  const apkBuffer = fs.readFileSync(APK_PATH);
-  const uploadRes = await fetch(targetUploadUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `token ${TOKEN}`,
-      'User-Agent': 'Node-Release-Uploader',
-      'Content-Type': 'application/vnd.android.package-archive',
-      'Content-Length': String(apkStats.size),
-    },
-    body: apkBuffer,
-  });
+  for (const item of apkFilesToUpload) {
+    if (!fs.existsSync(item.path)) continue;
+    const fileStats = fs.statSync(item.path);
+    const targetUploadUrl = uploadUrl.replace(/\{.*?\}$/, '') + `?name=${item.name}`;
+    console.log(`[GitHub Release] Uploading asset ${item.name} (${(fileStats.size / (1024 * 1024)).toFixed(2)} MB)...`);
 
-  if (!uploadRes.ok) {
-    const errText = await uploadRes.text();
-    console.error(`[GitHub Release] Asset upload failed:`, errText);
-    process.exit(1);
+    const apkBuffer = fs.readFileSync(item.path);
+    const uploadRes = await fetch(targetUploadUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `token ${TOKEN}`,
+        'User-Agent': 'Node-Release-Uploader',
+        'Content-Type': 'application/vnd.android.package-archive',
+        'Content-Length': String(fileStats.size),
+      },
+      body: apkBuffer,
+    });
+
+    if (!uploadRes.ok) {
+      const errText = await uploadRes.text();
+      console.warn(`[GitHub Release] Asset ${item.name} upload response:`, errText);
+    } else {
+      const assetInfo = await uploadRes.json();
+      console.log(`[GitHub Release] Successfully uploaded ${item.name}!`);
+      console.log(`[GitHub Release] Direct URL: ${assetInfo.browser_download_url}`);
+    }
   }
-
-  const assetInfo = await uploadRes.json();
-  console.log(`[GitHub Release] Successfully uploaded app-debug.apk!`);
-  console.log(`[GitHub Release] Browser download URL: ${assetInfo.browser_download_url}`);
 }
 
 main().catch((err) => {

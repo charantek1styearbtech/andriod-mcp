@@ -1,9 +1,9 @@
 {
   "versionCode": 2,
   "versionName": "1.1.0",
-  "changelog": "OTA Update: Added robust gateway URL resolution, fallback update check, and strict Google OAuth.",
-  "apkSize": 20144796,
-  "apkSha256": "afa97f1130bf27113b709919f8fd1d2a4006318f42d18d5f3fde9ef783bfcc4e",
-  "downloadUrl": "https://github.com/charantek1styearbtech/andriod-mcp/releases/download/v1.1.0/app-debug.apk",
-  "publishedAt": "2026-09-23T10:49:50.000Z"
+  "changelog": "OTA Update: Renamed app to andriod agent, added robust gateway URL resolution, fallback update check, and strict Google OAuth.",
+  "apkSize": 19299640,
+  "apkSha256": "33cb6d0ee07ea817e17b0032b6150f006de57c2dad23c4ef4633a62c5be93296",
+  "downloadUrl": "https://github.com/charantek1styearbtech/andriod-mcp/releases/download/v1.1.0/andriod-agent.apk",
+  "publishedAt": "2026-09-23T17:04:00.000Z"
 }

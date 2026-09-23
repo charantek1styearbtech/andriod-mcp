@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Android Agent</string>
-    <string name="accessibility_service_label">Android Agent Service</string>
+    <string name="app_name">andriod agent</string>
+    <string name="accessibility_service_label">andriod agent Service</string>
     <string name="accessibility_service_description">Autonomous AI Agent accessibility service to observe screen contents and execute automated UI actions.</string>
 </resources>
