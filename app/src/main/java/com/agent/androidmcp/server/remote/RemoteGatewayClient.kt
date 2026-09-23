@@ -40,6 +40,7 @@ object RemoteGatewayClient {
 
         RemoteGatewayConfigRepository.saveConfig(context, currentUrl, currentDeviceId, currentToken)
         RemoteGatewayState.updateConfig(currentUrl, currentDeviceId, currentToken)
+        RemoteGatewayState.updateConnected(false, null)
 
         connectInternal()
     }
@@ -55,7 +56,7 @@ object RemoteGatewayClient {
             Log.w(TAG, "Error closing socket: ${e.message}")
         }
         activeSocket = null
-        RemoteGatewayState.updateConnected(false)
+        RemoteGatewayState.updateConnected(false, null)
         RemoteGatewayState.setActivity("Disconnected by user")
     }
 

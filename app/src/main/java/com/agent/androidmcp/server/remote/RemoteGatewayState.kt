@@ -56,7 +56,7 @@ object RemoteGatewayConfigRepository {
 
         // Ensure URL always defaults to production public gateway if unset or pointing to old local IPs
         var serverUrl = prefs.getString(KEY_SERVER_URL, null)
-        if (serverUrl.isNullOrBlank() || serverUrl.contains("192.168.") || serverUrl.contains("localhost")) {
+        if (serverUrl.isNullOrBlank() || !serverUrl.startsWith("wss://andriod-mcp-gateway")) {
             serverUrl = DEFAULT_URL
             prefs.edit().putString(KEY_SERVER_URL, DEFAULT_URL).apply()
         }
