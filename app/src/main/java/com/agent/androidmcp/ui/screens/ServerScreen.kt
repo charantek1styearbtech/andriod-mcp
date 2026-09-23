@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
@@ -228,6 +229,13 @@ fun ServerScreen(
             var gatewayUrlInput by remember { mutableStateOf(gatewayStatus.serverUrl) }
             var gatewayDeviceIdInput by remember { mutableStateOf(gatewayStatus.deviceId) }
             var gatewayTokenInput by remember { mutableStateOf(gatewayStatus.token) }
+            var showCustomServer by remember { mutableStateOf(false) }
+
+            val effectiveGatewayUrl = if (showCustomServer && gatewayUrlInput.isNotBlank()) {
+                gatewayUrlInput.trim()
+            } else {
+                com.agent.androidmcp.server.remote.RemoteGatewayConfigRepository.DEFAULT_URL
+            }
 
             val googleAccount by com.agent.androidmcp.auth.GoogleAuthManager.accountState.collectAsState()
             var showManualEmailDialog by remember { mutableStateOf(false) }
@@ -244,7 +252,7 @@ fun ServerScreen(
                         if (gatewayStatus.isConnected) {
                             com.agent.androidmcp.server.remote.RemoteGatewayClient.start(
                                 context = context,
-                                url = gatewayUrlInput,
+                                url = effectiveGatewayUrl,
                                 deviceId = gatewayDeviceIdInput,
                                 token = gatewayTokenInput
                             )
@@ -391,7 +399,7 @@ fun ServerScreen(
                                                 if (gatewayStatus.isConnected) {
                                                     com.agent.androidmcp.server.remote.RemoteGatewayClient.start(
                                                         context = context,
-                                                        url = gatewayUrlInput,
+                                                        url = effectiveGatewayUrl,
                                                         deviceId = gatewayDeviceIdInput,
                                                         token = gatewayTokenInput
                                                     )
@@ -454,7 +462,7 @@ fun ServerScreen(
                                             if (gatewayStatus.isConnected) {
                                                 com.agent.androidmcp.server.remote.RemoteGatewayClient.start(
                                                     context = context,
-                                                    url = gatewayUrlInput,
+                                                    url = effectiveGatewayUrl,
                                                     deviceId = gatewayDeviceIdInput,
                                                     token = gatewayTokenInput
                                                 )
@@ -476,23 +484,78 @@ fun ServerScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    OutlinedTextField(
-                        value = gatewayUrlInput,
-                        onValueChange = { gatewayUrlInput = it },
-                        label = { Text("Gateway WebSocket URL", color = TextSecondary, fontSize = 12.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
+                    // Cloud Gateway Badge Card (Hardcoded Production URL)
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.25f),
                         shape = RoundedCornerShape(10.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AccentTeal,
-                            unfocusedBorderColor = BorderSubtle,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        ),
-                        enabled = !gatewayStatus.isConnected && !gatewayStatus.isConnecting
-                    )
+                        border = BorderStroke(1.dp, BorderSubtle),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f).padding(end = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Dns,
+                                    contentDescription = null,
+                                    tint = AccentTeal,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "Cloud Backend",
+                                        fontSize = 11.sp,
+                                        color = TextSecondary
+                                    )
+                                    Text(
+                                        text = "andriod-mcp-gateway.onrender.com",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = TextPrimary
+                                    )
+                                }
+                            }
+                            TextButton(
+                                onClick = { showCustomServer = !showCustomServer },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = if (showCustomServer) "Default" else "Custom",
+                                    fontSize = 11.sp,
+                                    color = if (showCustomServer) AccentTeal else TextSecondary
+                                )
+                            }
+                        }
+                    }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    if (showCustomServer) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = gatewayUrlInput,
+                            onValueChange = { gatewayUrlInput = it },
+                            label = { Text("Custom Gateway WebSocket URL", color = TextSecondary, fontSize = 11.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(10.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = AccentTeal,
+                                unfocusedBorderColor = BorderSubtle,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            enabled = !gatewayStatus.isConnected && !gatewayStatus.isConnecting
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
@@ -536,13 +599,9 @@ fun ServerScreen(
                             if (gatewayStatus.isConnected || gatewayStatus.isConnecting) {
                                 com.agent.androidmcp.server.remote.RemoteGatewayClient.stop()
                             } else {
-                                if (gatewayUrlInput.isBlank()) {
-                                    Toast.makeText(context, "Please enter a Gateway URL", Toast.LENGTH_SHORT).show()
-                                    return@Button
-                                }
                                 com.agent.androidmcp.server.remote.RemoteGatewayClient.start(
                                     context = context,
-                                    url = gatewayUrlInput,
+                                    url = effectiveGatewayUrl,
                                     deviceId = gatewayDeviceIdInput,
                                     token = gatewayTokenInput
                                 )

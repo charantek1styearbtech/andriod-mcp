@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 data class RemoteGatewayStatus(
     val isConnected: Boolean = false,
     val isConnecting: Boolean = false,
-    val serverUrl: String = "ws://192.168.0.100:3000/device/ws",
+    val serverUrl: String = RemoteGatewayConfigRepository.DEFAULT_URL,
     val deviceId: String = "oneplus_nord_4",
     val token: String = "nord4_token_secure",
     val lastError: String? = null,
@@ -24,7 +24,7 @@ object RemoteGatewayConfigRepository {
     private const val KEY_DEVICE_ID = "device_id"
     private const val KEY_TOKEN = "device_token"
     private const val KEY_AUTO_CONNECT = "auto_connect"
-    private const val DEFAULT_URL = "ws://192.168.0.100:3000/device/ws"
+    const val DEFAULT_URL = "wss://andriod-mcp-gateway.onrender.com/device/ws"
 
     private fun generateDefaultDeviceId(): String {
         val model = android.os.Build.MODEL.replace("[^a-zA-Z0-9]".toRegex(), "_").lowercase().take(12).ifEmpty { "device" }
@@ -54,8 +54,15 @@ object RemoteGatewayConfigRepository {
                 .apply()
         }
 
+        // Ensure URL always defaults to production public gateway if unset or pointing to old local IPs
+        var serverUrl = prefs.getString(KEY_SERVER_URL, null)
+        if (serverUrl.isNullOrBlank() || serverUrl.contains("192.168.") || serverUrl.contains("localhost")) {
+            serverUrl = DEFAULT_URL
+            prefs.edit().putString(KEY_SERVER_URL, DEFAULT_URL).apply()
+        }
+
         return RemoteGatewayStatus(
-            serverUrl = prefs.getString(KEY_SERVER_URL, DEFAULT_URL) ?: DEFAULT_URL,
+            serverUrl = serverUrl,
             deviceId = deviceId,
             token = token
         )
