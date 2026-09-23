@@ -159,7 +159,7 @@ export class MongoDatabase {
             ...(device.token ? { token: device.token } : {}),
           },
         },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
     } catch (err) {
       console.warn('[MongoDB] Failed to upsert device in DB:', (err as Error).message);
